@@ -13,6 +13,7 @@ const {
   handleRaid,
   handleCheer,
 } = require('./src/handlers/messageHandler');
+const { startAutoMessages } = require('./src/automessages');
 
 // ── Serveur HTTP healthcheck (démarre EN PREMIER pour Sliplane) ──────────────
 const PORT = process.env.PORT || 3000;
@@ -135,7 +136,12 @@ function startBot() {
 
   // ── Connexion ────────────────────────────────────────────────────────────────
   console.log('📄 Connexion au chat Twitch...');
-  client.connect().catch(err => {
+  client.connect().then(() => {
+    // Démarrer les auto-messages après connexion
+    const intervalMinutes = parseInt(process.env.AUTOMSG_INTERVAL) || 20;
+    const minMessages = parseInt(process.env.AUTOMSG_MIN_CHAT) || 5;
+    startAutoMessages(client, `#${process.env.CHANNEL_NAME}`, intervalMinutes, minMessages);
+  }).catch(err => {
     console.error('❌ Erreur de connexion Twitch :', err.message);
     // Retry après 10s sans tuer le process
     setTimeout(() => startBot(), 10000);
