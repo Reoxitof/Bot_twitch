@@ -38,7 +38,21 @@ const CONFIG = {
   // Mots interdits
   bannedWords: {
     enabled: true,
-    words: [],            // à remplir selon tes besoins
+    words: [
+      // Insultes directes
+      'connard','connasse','encule','fils de pute','fdp','salope','pute',
+      'batard','tg','va te faire foutre','bouffon','abruti','cretin','idiot',
+      // Insultes graves / haine
+      'ntm','nique ta mere','nique ta maman','va te faire','je temerde',
+      // Racisme / discrimination
+      'negre','negro','youpin','bougnoule','feuj','pede','tapette','travelo',
+      'bamboula','bicot','raton','bounty',
+      // Menaces
+      'je vais te tuer','je te bute','je te retrouve','je sais ou tu habites',
+      'ddos','doxx','je te hack',
+      // Spam / pub
+      'follow4follow','f4f','sub4sub','dropbuy','promo','check my',
+    ],
     action: 'timeout',
     duration: 300,
     warnFirst: false,     // ban direct sans avertissement
