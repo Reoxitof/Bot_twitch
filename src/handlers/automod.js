@@ -132,17 +132,35 @@ function detectLink(message) {
   return false;
 }
 
+// ── Table homoglyphes unicode → ASCII ────────────────────────────────────────
+const HOMOGLYPHS = {
+  // Cyrillique
+  'а':'a','е':'e','о':'o','р':'p','с':'c','х':'x','у':'y','і':'i','ѕ':'s',
+  'ј':'j','ԁ':'d','ԛ':'q','ԝ':'w','ѵ':'v','ƅ':'b',
+  // Grec
+  'α':'a','β':'b','γ':'g','ε':'e','ζ':'z','η':'h','ι':'i','κ':'k','μ':'m',
+  'ν':'n','ο':'o','ρ':'p','σ':'s','τ':'t','υ':'u','φ':'f','χ':'x','ω':'w',
+  // Latin étendu / unicode similaires
+  'ℓ':'l','℮':'e','ℕ':'n','ℤ':'z','ℝ':'r','ℂ':'c','ℚ':'q','ℙ':'p',
+  '\u0000':' ', // nul
+};
+
 /**
- * Normalise un texte pour contourner les tentatives d'évasion :
- * - Supprime espaces, tirets, points, underscores ENTRE les lettres
- * - Remplace les caractères accentués/spéciaux par leur équivalent ASCII
- * - Passe en minuscules
- * Exemples : "n t m" → "ntm" | "c.o.n.n.a.r.d" → "connard" | "énculé" → "encule"
+ * Normalise un texte pour contourner toutes les tentatives d'évasion :
+ * 1. Homoglyphes unicode (cyrillique, grec, etc.)
+ * 2. Accents et caractères spéciaux → ASCII
+ * 3. Leetspeak (0→o, 1→i, 3→e, etc.)
+ * 4. Déduplication de lettres (coonnnard → conard)
+ * 5. Suppression séparateurs (espaces, points, tirets...)
  */
 function normalizeText(text) {
-  return text
-    .toLowerCase()
-    // Remplacement caractères accentués / leetspeak courant
+  let t = text.toLowerCase();
+
+  // 1. Homoglyphes unicode
+  t = t.split('').map(c => HOMOGLYPHS[c] || c).join('');
+
+  // 2. Accents / caractères spéciaux
+  t = t
     .replace(/[àáâãäå]/g, 'a')
     .replace(/[èéêë]/g, 'e')
     .replace(/[ìíîï]/g, 'i')
@@ -153,30 +171,83 @@ function normalizeText(text) {
     .replace(/[ç]/g, 'c')
     .replace(/[œ]/g, 'oe')
     .replace(/[æ]/g, 'ae')
-    .replace(/[@]/g, 'a')
-    .replace(/[0]/g, 'o')
-    .replace(/[1]/g, 'i')
-    .replace(/[3]/g, 'e')
-    .replace(/[4]/g, 'a')
-    .replace(/[5]/g, 's')
-    .replace(/[7]/g, 't')
-    .replace(/[8]/g, 'b')
-    // Supprime tous les séparateurs entre caractères (espaces, points, tirets, etc.)
-    .replace(/[\s\.\-_\*\/\\|,;:!?'"`~^+=%#&()[\]{}]/g, '');
+    // Zalgo / diacritiques combinants unicode
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u0489\u20d0-\u20ff\ufe20-\ufe2f]/g, '');
+
+  // 3. Leetspeak
+  t = t
+    .replace(/@/g, 'a')
+    .replace(/0/g, 'o')
+    .replace(/1/g, 'i')
+    .replace(/3/g, 'e')
+    .replace(/4/g, 'a')
+    .replace(/5/g, 's')
+    .replace(/7/g, 't')
+    .replace(/8/g, 'b')
+    .replace(/\$/g, 's')
+    .replace(/\+/g, 't')
+    .replace(/!/g, 'i')
+    .replace(/\|/g, 'i');
+
+  // 4. Suppression séparateurs
+  t = t.replace(/[\s.\-_*/\\,;:'"´`~^=%#&()[\]{}?!]/g, '');
+
+  // 5. Déduplication : "coonnnard" → "conard"
+  t = t.replace(/(.)\1+/g, '$1');
+
+  return t;
+}
+
+/**
+ * Distance de Levenshtein — mesure la similarité entre deux chaînes
+ * Retourne le nb de modifications nécessaires pour passer de a à b
+ */
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i-1] === b[j-1]
+        ? dp[i-1][j-1]
+        : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+
+/**
+ * Vérifie si un mot interdit est présent dans le message normalisé,
+ * en utilisant une fenêtre glissante + distance de Levenshtein
+ * pour attraper les variantes proches (ex: "connart" ≈ "connard")
+ */
+function fuzzyContains(normalizedMsg, normalizedWord) {
+  // Recherche exacte d'abord
+  if (normalizedMsg.includes(normalizedWord)) return true;
+
+  // Fenêtre glissante avec tolérance Levenshtein
+  const wLen     = normalizedWord.length;
+  const tolerance = wLen <= 4 ? 0 : wLen <= 6 ? 1 : 2; // tolérance selon longueur
+  if (tolerance === 0) return false;
+
+  for (let i = 0; i <= normalizedMsg.length - wLen + tolerance; i++) {
+    const window = normalizedMsg.slice(i, i + wLen + tolerance);
+    if (levenshtein(window, normalizedWord) <= tolerance) return true;
+  }
+  return false;
 }
 
 function detectBannedWord(message) {
   if (!CONFIG.bannedWords.enabled) return false;
   if (CONFIG.bannedWords.words.length === 0) return false;
 
-  // On teste sur le texte normalisé ET sur le texte original (lowercase)
   const normalized = normalizeText(message);
-  const lower      = message.toLowerCase();
 
   return CONFIG.bannedWords.words.some(w => {
     const wNorm = normalizeText(w);
-    const wLow  = w.toLowerCase();
-    return normalized.includes(wNorm) || lower.includes(wLow);
+    return fuzzyContains(normalized, wNorm);
   });
 }
 
