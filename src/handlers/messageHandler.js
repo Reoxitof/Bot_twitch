@@ -6,6 +6,7 @@ const generalCommands = require('../commands/general');
 const papierCommands = require('../commands/papier');
 const funCommands = require('../commands/fun');
 const moderationCommands = require('../commands/moderation');
+const { checkAutoMod, handleAutoModCommand } = require('./automod');
 
 // Fusion de toutes les commandes
 const allCommands = {
@@ -63,6 +64,9 @@ function handleMessage(client, channel, userstate, message, self) {
   // Ignorer les messages du bot lui-même
   if (self) return;
 
+  // ── Auto-modération (avant tout le reste) ──────────────────────────────────
+  checkAutoMod(client, channel, userstate, message);
+
   const prefix = process.env.COMMAND_PREFIX || '!';
 
   // Vérifier si c'est une commande
@@ -72,6 +76,16 @@ function handleMessage(client, channel, userstate, message, self) {
   const parts = message.slice(prefix.length).trim().split(/\s+/);
   const commandName = parts[0].toLowerCase();
   const args = parts.slice(1);
+
+  // Commande spéciale automod (mod only, gérée séparément)
+  if (commandName === 'automod') {
+    if (!isMod(userstate)) {
+      client.say(channel, `❌ @${userstate['display-name'] || userstate.username}, cette commande est réservée aux modérateurs !`);
+      return;
+    }
+    handleAutoModCommand(client, channel, userstate, args);
+    return;
+  }
 
   // Chercher la commande
   const command = allCommands[commandName];
