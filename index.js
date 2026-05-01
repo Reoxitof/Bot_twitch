@@ -136,6 +136,19 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
+// ── Serveur HTTP healthcheck (requis par Sliplane) ───────────────────────────
+const http = require('http');
+const PORT = process.env.PORT || 3000;
+
+const healthServer = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ status: 'ok', bot: 'Streamer en Papier', uptime: process.uptime() }));
+});
+
+healthServer.listen(PORT, () => {
+  console.log(`🌐 Healthcheck HTTP sur le port ${PORT}`);
+});
+
 // ── Démarrage ────────────────────────────────────────────────────────────────
 console.log('📄 Démarrage du Bot Twitch - Streamer en Papier...');
 client.connect().catch(err => {
