@@ -132,11 +132,52 @@ function detectLink(message) {
   return false;
 }
 
+/**
+ * Normalise un texte pour contourner les tentatives d'évasion :
+ * - Supprime espaces, tirets, points, underscores ENTRE les lettres
+ * - Remplace les caractères accentués/spéciaux par leur équivalent ASCII
+ * - Passe en minuscules
+ * Exemples : "n t m" → "ntm" | "c.o.n.n.a.r.d" → "connard" | "énculé" → "encule"
+ */
+function normalizeText(text) {
+  return text
+    .toLowerCase()
+    // Remplacement caractères accentués / leetspeak courant
+    .replace(/[àáâãäå]/g, 'a')
+    .replace(/[èéêë]/g, 'e')
+    .replace(/[ìíîï]/g, 'i')
+    .replace(/[òóôõö]/g, 'o')
+    .replace(/[ùúûü]/g, 'u')
+    .replace(/[ýÿ]/g, 'y')
+    .replace(/[ñ]/g, 'n')
+    .replace(/[ç]/g, 'c')
+    .replace(/[œ]/g, 'oe')
+    .replace(/[æ]/g, 'ae')
+    .replace(/[@]/g, 'a')
+    .replace(/[0]/g, 'o')
+    .replace(/[1]/g, 'i')
+    .replace(/[3]/g, 'e')
+    .replace(/[4]/g, 'a')
+    .replace(/[5]/g, 's')
+    .replace(/[7]/g, 't')
+    .replace(/[8]/g, 'b')
+    // Supprime tous les séparateurs entre caractères (espaces, points, tirets, etc.)
+    .replace(/[\s\.\-_\*\/\\|,;:!?'"`~^+=%#&()[\]{}]/g, '');
+}
+
 function detectBannedWord(message) {
   if (!CONFIG.bannedWords.enabled) return false;
   if (CONFIG.bannedWords.words.length === 0) return false;
-  const lower = message.toLowerCase();
-  return CONFIG.bannedWords.words.some(w => lower.includes(w.toLowerCase()));
+
+  // On teste sur le texte normalisé ET sur le texte original (lowercase)
+  const normalized = normalizeText(message);
+  const lower      = message.toLowerCase();
+
+  return CONFIG.bannedWords.words.some(w => {
+    const wNorm = normalizeText(w);
+    const wLow  = w.toLowerCase();
+    return normalized.includes(wNorm) || lower.includes(wLow);
+  });
 }
 
 function detectRepetition(message) {
