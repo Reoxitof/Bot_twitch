@@ -7,6 +7,7 @@ const papierCommands = require('../commands/papier');
 const funCommands = require('../commands/fun');
 const moderationCommands = require('../commands/moderation');
 const { checkAutoMod, handleAutoModCommand } = require('./automod');
+const { addPoints, log, LOG_LEVELS } = require('../store');
 
 // Fusion de toutes les commandes
 const allCommands = {
@@ -94,8 +95,12 @@ function handleMessage(client, channel, userstate, message, self) {
   const userId = userstate['user-id'] || userstate.username;
   const username = userstate['display-name'] || userstate.username;
 
+  // Gagner 1 point par message (hors commandes)
+  addPoints(userId, username, 1);
+
   // Vérifier les permissions mod
   if (command.modOnly && !isMod(userstate)) {
+    log(LOG_LEVELS.WARN, `Commande mod refusée`, { user: username, cmd: commandName });
     client.say(channel, `❌ @${username}, cette commande est réservée aux modérateurs ! 📄`);
     return;
   }
@@ -120,12 +125,9 @@ function handleMessage(client, channel, userstate, message, self) {
     if (response) {
       client.say(channel, response);
     }
-
-    if (process.env.DEBUG === 'true') {
-      console.log(`[CMD] ${username} → !${commandName} ${args.join(' ')}`);
-    }
+    log(LOG_LEVELS.CMD, `!${commandName}`, { user: username, args: args.join(' ') || undefined });
   } catch (error) {
-    console.error(`[ERREUR] Commande !${commandName} :`, error.message);
+    log(LOG_LEVELS.ERROR, `Commande !${commandName} échouée`, { user: username, err: error.message });
   }
 }
 

@@ -79,7 +79,7 @@ const CONFIG = {
 
 // ── Stockage des données utilisateurs ────────────────────────────────────────
 const userHistory = new Map();   // historique messages par user
-const warnings   = new Map();    // nb d'avertissements par user
+const warnings   = new Map();    // userId → { count, username }
 
 function getUserData(userId) {
   if (!userHistory.has(userId)) {
@@ -89,13 +89,14 @@ function getUserData(userId) {
 }
 
 function getWarnings(userId) {
-  return warnings.get(userId) || 0;
+  return (warnings.get(userId) || {}).count || 0;
 }
 
-function addWarning(userId) {
-  const w = getWarnings(userId) + 1;
-  warnings.set(userId, w);
-  return w;
+function addWarning(userId, username) {
+  const prev = warnings.get(userId) || { count: 0, username };
+  const updated = { count: prev.count + 1, username: username || prev.username };
+  warnings.set(userId, updated);
+  return updated.count;
 }
 
 // ── Détecteurs ────────────────────────────────────────────────────────────────
@@ -284,7 +285,7 @@ function applySanction(client, channel, username, userId, rule, reason) {
 
   // Si warnFirst et pas encore averti → avertissement
   if (cfg.warnFirst && warnNb === 0) {
-    const w = addWarning(userId);
+    const w = addWarning(userId, username);
     client.say(channel,
       `⚠️ @${username} : Attention ! ${reason} (Avertissement ${w}/3). Continue et tu seras sanctionné ! 📄`
     );
@@ -295,7 +296,7 @@ function applySanction(client, channel, username, userId, rule, reason) {
   if (warnNb >= 3) {
     const longDur = cfg.duration * 5;
     client.timeout(channel, username, longDur, reason);
-    warnings.set(userId, 0); // reset après sanction lourde
+    warnings.set(userId, { count: 0, username }); // reset après sanction lourde
     client.say(channel,
       `🚫 @${username} a été timeout ${longDur}s — trop d'avertissements. Raison : ${reason} 📄`
     );
@@ -304,7 +305,7 @@ function applySanction(client, channel, username, userId, rule, reason) {
 
   // Action normale
   if (cfg.action === 'timeout' || cfg.action === 'delete') {
-    addWarning(userId);
+    addWarning(userId, username);
     client.timeout(channel, username, cfg.duration, reason);
     if (cfg.action === 'timeout') {
       client.say(channel,
@@ -315,7 +316,7 @@ function applySanction(client, channel, username, userId, rule, reason) {
     client.ban(channel, username, reason);
     client.say(channel, `🚫 @${username} a été banni — ${reason} 📄`);
   } else if (cfg.action === 'warn') {
-    const w = addWarning(userId);
+    const w = addWarning(userId, username);
     client.say(channel,
       `⚠️ @${username} : ${reason} (Avertissement ${w}/3) 📄`
     );
@@ -412,11 +413,20 @@ function handleAutoModCommand(client, channel, userstate, args) {
   if (sub === 'resetwarn') {
     const target = args[1]?.replace('@', '').toLowerCase();
     if (!target) { client.say(channel, `❌ Usage: !automod resetwarn @pseudo`); return; }
-    // Chercher par username dans la map
-    for (const [id] of warnings) {
-      warnings.set(id, 0);
+    // Chercher par username dans la map et reset uniquement ce user
+    let found = false;
+    for (const [id, data] of warnings) {
+      if (data.username && data.username.toLowerCase() === target) {
+        warnings.set(id, { count: 0, username: data.username });
+        found = true;
+        break;
+      }
     }
-    client.say(channel, `✅ Avertissements réinitialisés pour @${target} 📄`);
+    if (found) {
+      client.say(channel, `✅ Avertissements réinitialisés pour @${target} 📄`);
+    } else {
+      client.say(channel, `❌ Aucun avertissement trouvé pour @${target}`);
+    }
     return;
   }
 

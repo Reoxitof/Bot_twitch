@@ -134,23 +134,28 @@ const commands = {
     }
   },
 
-  // !score - Score de pliage du viewer (fun)
+  // !score - Score de pliage du viewer (basé sur les vrais points)
   score: {
     description: 'Affiche ton score de maître origami',
     cooldown: 15,
     handler: (client, channel, userstate) => {
-      const name = userstate['display-name'] || userstate.username;
-      const score = Math.floor(Math.random() * 1000) + 1;
+      const { getPoints, getTop } = require('../store');
+      const name   = userstate['display-name'] || userstate.username;
+      const userId = userstate['user-id'] || userstate.username;
+      const score  = getPoints(userId, name);
+      const top    = getTop(1);
+      const isFirst = top.length > 0 && top[0].username === name;
       const titres = [
-        { min: 0, max: 100, titre: '🌱 Apprenti Plisseur' },
-        { min: 101, max: 300, titre: '📄 Plieur Amateur' },
-        { min: 301, max: 500, titre: '✂️ Artisan du Papier' },
-        { min: 501, max: 700, titre: '🦢 Maître Origami' },
-        { min: 701, max: 900, titre: '🌸 Grand Maître du Pli' },
-        { min: 901, max: 1000, titre: '🐉 Légende du Papier' },
+        { min: 0,    max: 50,   titre: '🌱 Apprenti Plisseur' },
+        { min: 51,   max: 150,  titre: '📄 Plieur Amateur' },
+        { min: 151,  max: 400,  titre: '✂️ Artisan du Papier' },
+        { min: 401,  max: 800,  titre: '🦢 Maître Origami' },
+        { min: 801,  max: 1500, titre: '🌸 Grand Maître du Pli' },
+        { min: 1501, max: Infinity, titre: '🐉 Légende du Papier' },
       ];
-      const titre = titres.find(t => score >= t.min && score <= t.max);
-      return `📊 Score origami de ${name} : ${score} points | Titre : ${titre.titre} 📄✂️`;
+      const titre = titres.find(t => score >= t.min && score <= t.max) || titres[0];
+      const crown = isFirst ? ' 👑 #1 du chat !' : '';
+      return `📊 Score de ${name} : ${score} pts | ${titre.titre}${crown} 📄`;
     }
   },
 

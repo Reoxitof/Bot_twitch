@@ -83,7 +83,19 @@ const commands = {
     }
   },
 
-  // !so - Shoutout (modérateurs seulement)
+  // !top - Top viewers par points
+  top: {
+    description: 'Affiche le top 5 des viewers les plus actifs',
+    cooldown: 30,
+    handler: (client, channel, userstate) => {
+      const { getTop } = require('../store');
+      const top = getTop(5);
+      if (top.length === 0) return `📄 Pas encore de scores ! Chattez pour gagner des points 📄`;
+      const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+      const list = top.map((u, i) => `${medals[i]} ${u.username} (${u.points}pts)`).join(' | ');
+      return `🏆 Top viewers : ${list} 📄`;
+    }
+  },
   so: {
     description: 'Fait un shoutout à un streamer (mod only)',
     modOnly: true,

@@ -15,6 +15,7 @@ const {
 } = require('./src/handlers/messageHandler');
 const { startAutoMessages } = require('./src/automessages');
 const { startLiveAlert } = require('./src/liveAlert');
+const { log, LOG_LEVELS } = require('./src/store');
 
 // ── Serveur HTTP healthcheck (démarre EN PREMIER pour Sliplane) ──────────────
 const PORT = process.env.PORT || 3000;
@@ -69,6 +70,7 @@ function startBot() {
   // ── Événements ──────────────────────────────────────────────────────────────
 
   client.on('connected', (addr, port) => {
+    log(LOG_LEVELS.INFO, `Connecté à ${addr}:${port}`, { channel: process.env.CHANNEL_NAME, bot: process.env.BOT_USERNAME });
     console.log('');
     console.log('📄 ═══════════════════════════════════════════');
     console.log('📄   BOT TWITCH - STREAMER EN PAPIER');
@@ -82,11 +84,11 @@ function startBot() {
   });
 
   client.on('disconnected', (reason) => {
-    console.warn(`⚠️  Déconnecté : ${reason}`);
+    log(LOG_LEVELS.WARN, `Déconnecté`, { reason });
   });
 
   client.on('reconnect', () => {
-    console.log('🔄 Reconnexion en cours...');
+    log(LOG_LEVELS.INFO, 'Reconnexion en cours...');
   });
 
   // Messages du chat
@@ -122,11 +124,13 @@ function startBot() {
   });
 
   client.on('raided', (channel, username, viewers) => {
+    log(LOG_LEVELS.INFO, `Raid reçu`, { from: username, viewers });
     handleRaid(client, channel, username, viewers);
   });
 
   client.on('hosted', (channel, username, viewers, autohost) => {
     if (!autohost) {
+      log(LOG_LEVELS.INFO, `Host reçu`, { from: username, viewers });
       client.say(channel, `📣 ${username} héberge le stream avec ${viewers} viewers ! Merci beaucoup ! 📄✂️🦢`);
     }
   });
