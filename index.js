@@ -15,7 +15,7 @@ const {
 } = require('./src/handlers/messageHandler');
 const { startAutoMessages } = require('./src/automessages');
 const { startLiveAlert } = require('./src/liveAlert');
-const { log, LOG_LEVELS } = require('./src/store');
+const { log, LOG_LEVELS, initDB } = require('./src/store');
 
 // ── Serveur HTTP healthcheck (démarre EN PREMIER pour Sliplane) ──────────────
 const PORT = process.env.PORT || 3000;
@@ -31,7 +31,7 @@ const healthServer = http.createServer((req, res) => {
 
 healthServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🌐 Healthcheck HTTP en écoute sur 0.0.0.0:${PORT}`);
-  startBot();
+  initDB().then(() => startBot());
 });
 
 // ── Démarrage du bot (après le healthcheck) ──────────────────────────────────
